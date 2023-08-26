@@ -1,31 +1,24 @@
-# Combined script to record audio and convert it to text
-
-# For audio recording
+import threading
+import tkinter as tk
 import numpy as np
 import soundfile as sf
 import sounddevice as sd
 from scipy.io.wavfile import write
-
-# For record audio based on silence
 import pyaudio
 import wave
 import audioop
-
-# For audio to text conversion
 import speech_recognition as sr
 from pydub import AudioSegment
-
-# For classification
 import os
 import openai
-import constant
-
-# For text to speech
 from gtts import gTTS
 import pygame
+import constant
+import emoji
 
-# For loudness measurement
-import librosa
+# Set your OpenAI API key
+
+# Function to record audio to a WAV file using sounddevice
 
 
 def record_audio_to_wav(filename):
@@ -44,19 +37,18 @@ def record_audio_to_wav(filename):
 
     print(f"Saved recording as {wav_filename}")
 
+# Function to record audio based on silence using pyaudio
+
 
 def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filename="voice.wav"):
-    # Initialize pyaudio
-    p = pyaudio.PyAudio()
+    p = pyaudio.PyAudio()  # Initialize pyaudio
 
-    # Start the stream
     stream = p.open(format=pyaudio.paInt16,
                     channels=1,
                     rate=44100,
                     input=True,
-                    frames_per_buffer=1024)
+                    frames_per_buffer=1024)  # Start the audio stream
 
-    # Parameters
     frame_count = 0
     frames = []
     is_recording = False
@@ -64,11 +56,9 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
     print("Waiting for a noise to start recording...")
 
     while True:
-        # Read a chunk from audio input
-        chunk = stream.read(1024)
+        chunk = stream.read(1024)  # Read a chunk from audio input
 
-        # Check for voice
-        rms = audioop.rms(chunk, 2)
+        rms = audioop.rms(chunk, 2)  # Check for voice
 
         if rms > thresh:
             if not is_recording:
@@ -81,28 +71,26 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
                 print("No voice detected.")
                 frame_count += 1
 
-        # If recording, append the frames
         if is_recording:
             frames.append(chunk)
 
-        # Check for maximum silence
         if frame_count > max_silence and is_recording:
             print("Max silence reached, stopping.")
             break
 
-    # Close and terminate everything properly
     stream.stop_stream()
     stream.close()
     p.terminate()
 
-    # Save audio to file
     if frames:
-        wf = wave.open(filename, 'wb')
+        wf = wave.open(filename, 'wb')  # Save audio to file
         wf.setnchannels(1)
         wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
         wf.setframerate(44100)
         wf.writeframes(b''.join(frames))
         wf.close()
+
+# Function to convert audio to text using Google Web Speech API
 
 
 def audio_to_text(audio_file_path):
@@ -123,6 +111,8 @@ def audio_to_text(audio_file_path):
         except sr.RequestError as e:
             return f"Could not request results from Google Web Speech API; {e}", 4
 
+# Function to classify emotion from text using OpenAI GPT-3
+
 
 def textToEmotion(text):
     completion = openai.ChatCompletion.create(
@@ -137,6 +127,8 @@ def textToEmotion(text):
     print(emotion)
     return emotion
 
+# Function to play text as audio using Google Text-to-Speech (gTTS) and pygame
+
 
 def play_text_as_audio(text, language='en'):
     tts = gTTS(text=text, lang=language)
@@ -149,6 +141,8 @@ def play_text_as_audio(text, language='en'):
     while pygame.mixer.music.get_busy():
         pygame.time.Clock().tick(10)
 
+# Function to get loudness and duration of an audio file
+
 
 def get_loudness(file_path):
     data, sample_rate = sf.read(file_path)
@@ -157,18 +151,102 @@ def get_loudness(file_path):
     duration = len(data) / sample_rate
     return loudness, duration
 
+# Class for the GUI application
 
-if __name__ == "__main__":
-    while True:
-        filename = "test"
+
+class MessageApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("emoSense")
+        self.root.configure(bg="white")
+
+        self.message = tk.StringVar()
+        self.message_label = tk.Label(
+            root, textvariable=self.message, font=("Helvetica", 320), fg="black", bg='white', borderwidth=0, highlightthickness=0)
+        self.message_label.pack(padx=20, pady=20)
+
+        self.start_button = tk.Button(
+            root, text="Start", command=self.start_processing, bg='blue')
+        self.start_button.pack()
+
+    def start_processing(self):
+        # Disable the button after it's pressed
+        self.start_button.config(state="disabled")
+
+        processing_thread = threading.Thread(target=self.process_loop)
+        processing_thread.start()
+
+    def process_loop(self):
         record_voice()
 
         audio_file_path = "voice.wav"
+
+        self.root.configure(bg='lightgreen')
+        self.message_label.config(bg='lightgreen')
+        self.message.set(emoji.emojize("\U000023F3"))  # Set an hourglass emoji
+
         loudness, duration = get_loudness(audio_file_path)
-        print("Average Loudness:", loudness)
-        print("Duration:", duration)
         text, length = audio_to_text(audio_file_path)
-        print(f"Transcribed text: {text}, Length: {length}")
+        print(f"Average Loudness: {loudness}, Duration {duration}")
+        print(f"Transcribed text: {text}, Length {length}")
+
+        self.root.configure(bg='green')
+        self.message_label.config(bg='green')
+        self.message.set(emoji.emojize(":thinking_face:")
+                         )  # Set a thinking face emoji
+
         emotion = textToEmotion(text)
         print(f"Emotion: {emotion}")
+
+        # Update the displayed emoji
+        self.message.set(emoji.emojize(self.get_emotion_emoji(emotion)))
+
+        # Set background color and text color based on emotion
+        self.update_text_color(emotion)
+        self.root.configure(bg=self.get_emotion_color(emotion))
+        self.message_label.config(bg=self.get_emotion_color(emotion))
+        self.start_button.config(bg=self.get_emotion_color(emotion))
+
         play_text_as_audio(emotion)
+
+        self.root.after(100, self.process_loop)  # Schedule next iteration
+
+    def get_emotion_emoji(self, emotion):
+        emojis = {
+            "anger": "\U0001F620",       # 😠
+            "disgust": "\U0001F922",     # 🤢
+            "fear": "\U0001F628",        # 😨
+            "joy": "\U0001F604",         # 😀
+            "sadness": "\U0001F614",     # 😔
+            "surprise": "\U0001F632",    # 😲
+            "neutral": "\U0001F610"      # 😐
+        }
+        # Return the appropriate emoji or a question mark emoji
+        return emojis.get(emotion, ":question:")
+
+    def update_text_color(self, emotion):
+        if emotion in ['anger', 'disgust', 'fear']:
+            # Set text color to white for dark backgrounds
+            self.message_label.config(fg='white')
+        else:
+            # Set text color to black for light backgrounds
+            self.message_label.config(fg='black')
+
+    def get_emotion_color(self, emotion):
+        colors = {
+            "anger": "red",
+            "disgust": "purple",
+            "fear": "darkorange",
+            "joy": "yellow",
+            "sadness": "blue",
+            "surprise": "pink",
+            "neutral": "white"
+        }
+        # Get the emotion color or default to white
+        return colors.get(emotion, "white")
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = MessageApp(root)
+    root.mainloop()
