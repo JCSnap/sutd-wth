@@ -1,6 +1,8 @@
 import React from "react";
 import { Button } from "react-native-paper";
 import { Audio } from "expo-av";
+import { View } from "react-native";
+import OpenaiButton from "../components/OpenaiButton";
 
 const Home = () => {
   const [recording, setRecording] = React.useState();
@@ -36,13 +38,16 @@ const Home = () => {
     console.log("Recording stopped and stored at", uri);
   }
   return (
-    <Button
-      icon="microphone"
-      mode="elevated"
-      onPress={recording ? stopRecording : startRecording}
-    >
-      {recording ? "Stop Recording" : "Start Recording"}
-    </Button>
+    <View>
+      <Button
+        icon="microphone"
+        mode="elevated"
+        onPress={recording ? stopRecording : startRecording}
+      >
+        {recording ? "Stop Recording" : "Start Recording"}
+      </Button>
+      <OpenaiButton />
+    </View>
   );
 };
 
