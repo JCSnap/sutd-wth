@@ -1,6 +1,8 @@
 # Combined script to record audio and convert it to text
 
 # For audio recording
+import numpy as np
+import soundfile as sf
 import sounddevice as sd
 from scipy.io.wavfile import write
 
@@ -22,6 +24,10 @@ import constant
 from gtts import gTTS
 import pygame
 
+# For loudness measurement
+import librosa
+
+
 def record_audio_to_wav(filename):
     fs = 44100  # Sample rate
     seconds = 3  # Duration of recording
@@ -37,6 +43,7 @@ def record_audio_to_wav(filename):
     write(wav_filename, fs, myrecording)  # Save as WAV file
 
     print(f"Saved recording as {wav_filename}")
+
 
 def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filename="voice.wav"):
     # Initialize pyaudio
@@ -62,7 +69,7 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
 
         # Check for voice
         rms = audioop.rms(chunk, 2)
-        
+
         if rms > thresh:
             if not is_recording:
                 print("Noise detected, starting recording!")
@@ -97,6 +104,7 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
         wf.writeframes(b''.join(frames))
         wf.close()
 
+
 def audio_to_text(audio_file_path):
     recognizer = sr.Recognizer()
 
@@ -106,27 +114,29 @@ def audio_to_text(audio_file_path):
 
     with sr.AudioFile("temp.wav") as source:
         audio_data = recognizer.record(source)
-        
+
         try:
             text = recognizer.recognize_google(audio_data)
-            return text
+            return text, len(text.split())
         except sr.UnknownValueError:
-            return "Google Web Speech API could not understand the audio."
+            return "Google Web Speech API could not understand the audio.", 4
         except sr.RequestError as e:
-            return f"Could not request results from Google Web Speech API; {e}"
+            return f"Could not request results from Google Web Speech API; {e}", 4
+
 
 def textToEmotion(text):
     completion = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
-    messages=[
-        {"role": "system", "content": constant.SYSTEM_MESSAGE},
-        {"role": "user", "content": text}
-    ]
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": constant.SYSTEM_MESSAGE},
+            {"role": "user", "content": text}
+        ]
     )
 
     emotion = completion.choices[0].message.content
     print(emotion)
     return emotion
+
 
 def play_text_as_audio(text, language='en'):
     tts = gTTS(text=text, lang=language)
@@ -139,14 +149,26 @@ def play_text_as_audio(text, language='en'):
     while pygame.mixer.music.get_busy():
         pygame.time.Clock().tick(10)
 
+
+def get_loudness(file_path):
+    data, sample_rate = sf.read(file_path)
+    rms = (data**2).mean()**0.5
+    loudness = 20 * np.log10(rms)
+    duration = len(data) / sample_rate
+    return loudness, duration
+
+
 if __name__ == "__main__":
     while True:
         filename = "test"
         record_voice()
 
-        audio_file_path =  "voice.wav"
-        text = audio_to_text(audio_file_path)
-        print(f"Transcribed text: {text}")
+        audio_file_path = "voice.wav"
+        loudness, duration = get_loudness(audio_file_path)
+        print("Average Loudness:", loudness)
+        print("Duration:", duration)
+        text, length = audio_to_text(audio_file_path)
+        print(f"Transcribed text: {text}, Length: {length}")
         emotion = textToEmotion(text)
         print(f"Emotion: {emotion}")
         play_text_as_audio(emotion)
