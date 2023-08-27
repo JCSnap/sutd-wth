@@ -130,7 +130,7 @@ def textToEmotion(text):
     completion = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": constant.SYSTEM_MESSAGE},
+            {"role": "system", "content": app.system_message},
             {"role": "user", "content": text}
         ]
     )
@@ -185,6 +185,8 @@ class MessageApp:
         self.additional_message_label.pack(
             padx=20, pady=10)  # Adjust padding as needed
 
+        self.system_message = ""
+        self.show_system_message_dialog()
         # self.start_button = tk.Button(
         #     root, text="Start", command=self.start_processing, bg='blue')
         # self.start_button.pack()
@@ -197,6 +199,29 @@ class MessageApp:
         processing_thread = threading.Thread(target=self.process_loop)
         processing_thread.start()
         # self.process_loop()
+
+    def show_system_message_dialog(self):
+        self.system_message_var = tk.StringVar(value="A")
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Select System Message")
+        
+        tk.Label(dialog, text="Select an option:").pack()
+        
+        tk.Radiobutton(dialog, text="Low Functioning", variable=self.system_message_var, value="low").pack()
+        tk.Radiobutton(dialog, text="High Functioning", variable=self.system_message_var, value="high").pack()
+        
+        tk.Button(dialog, text="OK", command=lambda: self.set_system_message_and_destroy_dialog(dialog)).pack()
+    
+    def set_system_message_and_destroy_dialog(self, dialog):
+        selected_option = self.system_message_var.get()
+        
+        if selected_option == "low":
+            self.system_message = constant.SYSTEM_MESSAGE1
+        elif selected_option == "high":
+            self.system_message = constant.SYSTEM_MESSAGE2
+        
+        dialog.destroy()
 
     def process_loop(self):
         record_voice()
@@ -259,7 +284,21 @@ class MessageApp:
             "joy": "\U0001F604",         # 😀
             "sadness": "\U0001F614",     # 😔
             "surprise": "\U0001F632",    # 😲
-            "neutral": "\U0001F610"      # 😐
+            "neutral": "\U0001F610" ,     # 😐
+            "mad": "\U0001F621",         # 😡
+            "distant": "\U0001F636",     # 😶
+            "disappointed": "\U0001F61E",  # 😞
+            "repulsed": "\U0001F616",    # 😖
+            "hurt": "\U0001F915",        # 🤕
+            "despair": "\U0001F62D",     # 😭
+            "optimistic": "\U0001F60A",  # 😊
+            "playful": "\U0001F61C",     # 😜
+            "startled": "\U0001F631",    # 😱
+            "excited": "\U0001F929",     # 🤩
+            "bored": "\U0001F634",       # 😴
+            "stressed": "\U0001F62C",    # 😬
+            "scared": "\U0001F628",      # 😨
+            "insecure": "\U0001F641",    # 🙁
         }
         # Return the appropriate emoji or a question mark emoji
         return emojis.get(emotion, ":question:")
@@ -288,11 +327,25 @@ class MessageApp:
             "joy": "yellow",
             "sadness": "blue",
             "surprise": "pink",
-            "neutral": "white"
+            "neutral": "white",
+            "mad": "darkred",
+            "distant": "grey",
+            "disappointed": "slategray",
+            "repulsed": "green",
+            "hurt": "brown",
+            "despair": "navy",
+            "optimistic": "lightyellow",
+            "playful": "lightpink",
+            "startled": "orange",
+            "excited": "gold",
+            "bored": "lightgrey",
+            "stressed": "black",
+            "scared": "darkorange",
+            "insecure": "darkgrey"
         }
+
         # Get the emotion color or default to white
         return colors.get(emotion, "white")
-
 
 if __name__ == "__main__":
     root = tk.Tk()
