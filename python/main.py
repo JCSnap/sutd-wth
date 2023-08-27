@@ -17,6 +17,7 @@ import constant
 import emoji
 
 # Set your OpenAI API key
+openai.api_key = "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"
 
 # Function to record audio to a WAV file using sounddevice
 
@@ -56,17 +57,21 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
     print("Waiting for a noise to start recording...")
 
     while True:
+
         chunk = stream.read(1024)  # Read a chunk from audio input
 
         rms = audioop.rms(chunk, 2)  # Check for voice
 
         if rms > thresh:
+            app.additional_message.set('Recording...')  # Set the message
             if not is_recording:
                 print("Noise detected, starting recording!")
                 is_recording = True
             print("Detected voice!")
             frame_count = 0
         else:
+            app.additional_message.set(
+                'No voice detected...')  # Set the message
             if is_recording:
                 print("No voice detected.")
                 frame_count += 1
@@ -165,6 +170,12 @@ class MessageApp:
             root, textvariable=self.message, font=("Helvetica", 320), fg="black", bg='white', borderwidth=0, highlightthickness=0)
         self.message_label.pack(padx=20, pady=20)
 
+        self.additional_message = tk.StringVar()
+        self.additional_message_label = tk.Label(
+            root, textvariable=self.additional_message, font=("Helvetica", 24), fg="black", bg='white', borderwidth=0, highlightthickness=0)
+        self.additional_message_label.pack(
+            padx=20, pady=10)  # Adjust padding as needed
+
         self.start_button = tk.Button(
             root, text="Start", command=self.start_processing, bg='blue')
         self.start_button.pack()
@@ -175,41 +186,45 @@ class MessageApp:
 
         processing_thread = threading.Thread(target=self.process_loop)
         processing_thread.start()
+        # self.process_loop()
 
     def process_loop(self):
         record_voice()
 
         audio_file_path = "voice.wav"
 
-        self.root.configure(bg='lightgreen')
-        self.message_label.config(bg='lightgreen')
+        self.root.configure(bg='green')
+        self.message_label.config(bg='green')
+        self.additional_message_label.config(bg='green')
         self.message.set(emoji.emojize("\U000023F3"))  # Set an hourglass emoji
+        self.additional_message.set('Loading...')  # Set the message
 
         loudness, duration = get_loudness(audio_file_path)
         text, length = audio_to_text(audio_file_path)
         print(f"Average Loudness: {loudness}, Duration {duration}")
         print(f"Transcribed text: {text}, Length {length}")
 
-        self.root.configure(bg='green')
-        self.message_label.config(bg='green')
-        self.message.set(emoji.emojize(":thinking_face:")
-                         )  # Set a thinking face emoji
-
         emotion = textToEmotion(text)
         print(f"Emotion: {emotion}")
 
         # Update the displayed emoji
         self.message.set(emoji.emojize(self.get_emotion_emoji(emotion)))
+        self.additional_message.set(text)  # Set an hourglass emoji
 
         # Set background color and text color based on emotion
         self.update_text_color(emotion)
         self.root.configure(bg=self.get_emotion_color(emotion))
         self.message_label.config(bg=self.get_emotion_color(emotion))
+        self.additional_message_label.config(
+            bg=self.get_emotion_color(emotion))
         self.start_button.config(bg=self.get_emotion_color(emotion))
 
         play_text_as_audio(emotion)
 
-        self.root.after(100, self.process_loop)  # Schedule next iteration
+        processing_thread = threading.Thread(target=self.process_loop)
+        processing_thread.start()
+        # Schedule next iteration
+        self.root.after(100, processing_thread.start)
 
     def get_emotion_emoji(self, emotion):
         emojis = {
