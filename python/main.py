@@ -58,11 +58,8 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
     print("Waiting for a noise to start recording...")
 
     while True:
-
         chunk = stream.read(1024)  # Read a chunk from audio input
-
         rms = audioop.rms(chunk, 2)  # Check for voice
-
         if rms > thresh:
             app.message.set("🗣️")  # Set an hourglass emoji
             app.additional_message.set('Recording...')  # Set the message
@@ -78,10 +75,8 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
             if is_recording:
                 print("No voice detected.")
                 frame_count += 1
-
         if is_recording:
             frames.append(chunk)
-
         if frame_count > max_silence and is_recording:
             print("Max silence reached, stopping.")
             break
@@ -162,7 +157,6 @@ def get_loudness(file_path):
 
 # Class for the GUI application
 
-
 class MessageApp:
     def __init__(self, root):
         self.root = root
@@ -209,6 +203,7 @@ class MessageApp:
         speed = "fast" if length / \
             duration > 3 else "normal" if length / duration > 2 else "slow"
         loud = "loud" if loudness > -20 else "normal" if loudness > -30 else "soft"
+
         if text != False:
             print(f"Average Loudness: {loudness}")
             print(
@@ -229,7 +224,6 @@ class MessageApp:
             self.message_label.config(bg=self.get_emotion_color(emotion))
             self.additional_message_label.config(
                 bg=self.get_emotion_color(emotion))
-            # self.start_button.config(bg=self.get_emotion_color(emotion))
 
             play_text_as_audio(emotion)
 
@@ -263,9 +257,11 @@ class MessageApp:
         if emotion in ['anger', 'disgust', 'fear']:
             # Set text color to white for dark backgrounds
             self.message_label.config(fg='white')
+            self.additional_message_label.config(fg='white')
         else:
             # Set text color to black for light backgrounds
             self.message_label.config(fg='black')
+            self.additional_message_label.config(fg='white')
 
     def get_emotion_color(self, emotion):
         colors = {
