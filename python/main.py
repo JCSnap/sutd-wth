@@ -15,9 +15,10 @@ from gtts import gTTS
 import pygame
 import constant
 import emoji
+import time
 
 # Set your OpenAI API key
-openai.api_key = "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"
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Function to record audio to a WAV file using sounddevice
 
@@ -63,6 +64,7 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
         rms = audioop.rms(chunk, 2)  # Check for voice
 
         if rms > thresh:
+            app.message.set("🗣️")  # Set an hourglass emoji
             app.additional_message.set('Recording...')  # Set the message
             if not is_recording:
                 print("Noise detected, starting recording!")
@@ -70,6 +72,7 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
             print("Detected voice!")
             frame_count = 0
         else:
+            app.message.set("🗣️")  # Set an hourglass emoji
             app.additional_message.set(
                 'No voice detected...')  # Set the message
             if is_recording:
@@ -112,7 +115,7 @@ def audio_to_text(audio_file_path):
             text = recognizer.recognize_google(audio_data)
             return text, len(text.split())
         except sr.UnknownValueError:
-            return "Google Web Speech API could not understand the audio.", 4
+            return False, 4
         except sr.RequestError as e:
             return f"Could not request results from Google Web Speech API; {e}", 4
 
@@ -120,6 +123,7 @@ def audio_to_text(audio_file_path):
 
 
 def textToEmotion(text):
+
     completion = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
@@ -176,13 +180,14 @@ class MessageApp:
         self.additional_message_label.pack(
             padx=20, pady=10)  # Adjust padding as needed
 
-        self.start_button = tk.Button(
-            root, text="Start", command=self.start_processing, bg='blue')
-        self.start_button.pack()
+        # self.start_button = tk.Button(
+        #     root, text="Start", command=self.start_processing, bg='blue')
+        # self.start_button.pack()
+        self.start_processing()
 
     def start_processing(self):
         # Disable the button after it's pressed
-        self.start_button.config(state="disabled")
+        # self.start_button.config(state="disabled")
 
         processing_thread = threading.Thread(target=self.process_loop)
         processing_thread.start()
@@ -201,30 +206,45 @@ class MessageApp:
 
         loudness, duration = get_loudness(audio_file_path)
         text, length = audio_to_text(audio_file_path)
-        print(f"Average Loudness: {loudness}, Duration {duration}")
-        print(f"Transcribed text: {text}, Length {length}")
+        speed = "fast" if length / \
+            duration > 3 else "normal" if length / duration > 2 else "slow"
+        loud = "loud" if loudness > -20 else "normal" if loudness > -30 else "soft"
+        if text != False:
+            print(f"Average Loudness: {loudness}")
+            print(
+                f"Transcribed text: {text}, Speed: {speed}, Loudness: {loud}")
 
-        emotion = textToEmotion(text)
-        print(f"Emotion: {emotion}")
+            emotion = textToEmotion(
+                "Sentence: " + text + "\nSpeed: " + speed + "\Loudness: " + loud)
 
-        # Update the displayed emoji
-        self.message.set(emoji.emojize(self.get_emotion_emoji(emotion)))
-        self.additional_message.set(text)  # Set an hourglass emoji
+            print(f"Emotion: {emotion}")
 
-        # Set background color and text color based on emotion
-        self.update_text_color(emotion)
-        self.root.configure(bg=self.get_emotion_color(emotion))
-        self.message_label.config(bg=self.get_emotion_color(emotion))
-        self.additional_message_label.config(
-            bg=self.get_emotion_color(emotion))
-        self.start_button.config(bg=self.get_emotion_color(emotion))
+            # Update the displayed emoji
+            self.message.set(emoji.emojize(self.get_emotion_emoji(emotion)))
+            self.additional_message.set(text)  # Set an hourglass emoji
 
-        play_text_as_audio(emotion)
+            # Set background color and text color based on emotion
+            self.update_text_color(emotion)
+            self.root.configure(bg=self.get_emotion_color(emotion))
+            self.message_label.config(bg=self.get_emotion_color(emotion))
+            self.additional_message_label.config(
+                bg=self.get_emotion_color(emotion))
+            # self.start_button.config(bg=self.get_emotion_color(emotion))
+
+            play_text_as_audio(emotion)
+
+        else:
+            self.message.set("❌")
+            self.additional_message.set(
+                'Could not detect voice. Try again.')  # Set the message
+
+        time.sleep(2)
 
         processing_thread = threading.Thread(target=self.process_loop)
         processing_thread.start()
+
         # Schedule next iteration
-        self.root.after(100, processing_thread.start)
+        self.root.after(1000, processing_thread.start)
 
     def get_emotion_emoji(self, emotion):
         emojis = {
