@@ -66,6 +66,7 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
             if not is_recording:
                 print("Noise detected, starting recording!")
                 is_recording = True
+                app.show_stop_button() 
             print("Detected voice!")
             frame_count = 0
         else:
@@ -79,6 +80,13 @@ def record_voice(thresh=constant.THRESH, max_silence=constant.MAX_SILENCE, filen
             frames.append(chunk)
         if frame_count > max_silence and is_recording:
             print("Max silence reached, stopping.")
+            app.stop_button.pack_forget()
+            break
+        if app.stop_recording_flag:  # Check the flag here
+            print("Stop button pressed, stopping.")
+            app.stop_button.pack_forget()
+            time.sleep(1)
+            app.stop_recording_flag = False  # Reset the flag
             break
 
     stream.stop_stream()
@@ -162,6 +170,9 @@ class MessageApp:
         self.root = root
         self.root.title("emoSense")
         self.root.configure(bg="white")
+
+        self.stop_recording_flag = False  
+        self.stop_button = tk.Button(root, text="Stop Recording", command=self.stop_recording, bg='red')
 
         self.message = tk.StringVar()
         self.message_label = tk.Label(
@@ -252,6 +263,12 @@ class MessageApp:
         }
         # Return the appropriate emoji or a question mark emoji
         return emojis.get(emotion, ":question:")
+
+    def stop_recording(self):
+        self.stop_recording_flag = True
+
+    def show_stop_button(self):
+        self.stop_button.pack()
 
     def update_text_color(self, emotion):
         if emotion in ['anger', 'disgust', 'fear']:
